@@ -15,7 +15,7 @@
 !  Last edit: 11/16/2017
 !     
 program main
-   use mpi
+   !use mpi
    use connectivity
    use explicit !defines U,V,A. assembly R_int, calculates A
    use extract  !calculate stresses
@@ -28,7 +28,8 @@ program main
                    ! for time measurement
    real(kind=8),parameter::zero=0.d0
    integer::i,num_Gauss_points ,ierr,j,k,gid,request,send_count, start_id,&
-           status(MPI_STATUS_SIZE),recv_request
+           !status(MPI_STATUS_SIZE),
+           recv_request
    real(kind=8),dimension(8,3)::temp1 !temp1=trans(B)*mat_mtx
    type(element_type)::element_data_local 
    type(node_type)::node_data_local
@@ -43,9 +44,9 @@ program main
 !  Initiate MPI
 !
 !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
-         call MPI_init(ierr)
-         call MPI_COMM_RANK(MPI_COMM_WORLD, myid, ierr)
-         call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs,ierr)
+         !call MPI_init(ierr)
+         !call MPI_COMM_RANK(MPI_COMM_WORLD, myid, ierr)
+         !call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs,ierr)
 !         
 !-- Read element, node, BC, force, crack data from file
 !
@@ -209,21 +210,23 @@ do it = 1,NT
    !==============================================================
          call cpu_time(time9)
   enddo
+  !! LUCIANO, COMMENTED
   !-- Send and receive shared node info -- 
   !
   !  print*, size(R_int)
-  if (myid .ne. 0) then
-     call mpi_send(R_int, 2*node_nums,MPI_double, 0,0,mpi_comm_world,&
-            ierr)
-     !call mpi_wait(request, status, ierr)
-  else
-     do i=1,(numprocs-1)
-        call mpi_recv(buffer, 2*node_nums, MPI_double, MPI_any_source,0,&
-                      mpi_comm_world, status, ierr)
-      !  call mpi_wait(recv_request, status,ierr)
-        R_int = R_int + buffer
-     enddo
-  endif
+
+  ! if (myid .ne. 0) then
+     ! call mpi_send(R_int, 2*node_nums,MPI_double, 0,0,mpi_comm_world,&
+            ! ierr)
+     ! !call mpi_wait(request, status, ierr)
+  ! else
+     ! do i=1,(numprocs-1)
+        ! call mpi_recv(buffer, 2*node_nums, MPI_double, MPI_any_source,0,&
+                      ! mpi_comm_world, status, ierr)
+      ! !  call mpi_wait(recv_request, status,ierr)
+        ! R_int = R_int + buffer
+     ! enddo
+  ! endif
 !---------------------------------------
   call cpu_time(time7)
    !print '(" Time for all element internal force calculation:", & 
@@ -238,13 +241,13 @@ do it = 1,NT
       call cpu_time(time5)
       print '("Timestep", I8, ",   cpu time=", f10.5)',it,time7-time6
 
-      call MPI_Bcast(A_temp,2*node_nums,MPI_double, 0,MPI_comm_world,ierr)
+      !!call MPI_Bcast(A_temp,2*node_nums,MPI_double, 0,MPI_comm_world,ierr) !LUCIANO, COMMENTED
    !print*, A_temp(4400:4404) 
    else
    ! manager has all the acceleration data
    ! now send  the updated accelration data to other processors 
 
-      call MPI_Bcast(A_temp,2*node_nums,MPI_double, 0,MPI_comm_world,ierr)
+      !!call MPI_Bcast(A_temp,2*node_nums,MPI_double, 0,MPI_comm_world,ierr) !!!LUCIANO, COMMENTED
       A_dt%values(:,1) = A_temp(1:2*node_nums-1:2)
       A_dt%values(:,2) = A_temp(2:2*node_nums:2)
    endif
@@ -281,5 +284,5 @@ if (myid .eq.  0) then
 
    print '("Total time:        ", f10.5)',time_end-time_start
    endif      
-call MPI_Finalize(ierr)
+!call MPI_Finalize(ierr)
 end program main
