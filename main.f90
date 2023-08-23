@@ -168,63 +168,66 @@ do it = 1,NT
   print *, "It ", it
    R_int= zero
    print *, "ext force "
-   call get_external_force(new_force_data,force_nums,node_nums, R_ext,it) 
-   ! if (it==1) then
-      ! V_dt%values = V%values + 0.5*CFL*dt_cri*A%values
-      ! U_dt%values = U%values + dt_cri*CFL*V_dt%values
-      ! A_dt%values = 0.d0
-   ! else
-      ! V%values = V_dt%values
-      ! U%values = U_dt%values
-      ! A%values = A_dt%values
+   !call get_external_force(new_force_data,force_nums,node_nums, R_ext,it) 
+   call get_external_force(force_data,force_nums,node_nums, R_ext,it) 
+   if (it==1) then
+      V_dt%values = V%values + 0.5*CFL*dt_cri*A%values
+      U_dt%values = U%values + dt_cri*CFL*V_dt%values
+      A_dt%values = 0.d0
+   else
+      V%values = V_dt%values
+      U%values = U_dt%values
+      A%values = A_dt%values
 
-      ! V_dt%values = V%values + dt_cri*CFL*A%values
-      ! U_dt%values = U%values + dt_cri*CFL*V_dt%values
+      V_dt%values = V%values + dt_cri*CFL*A%values
+      U_dt%values = U%values + dt_cri*CFL*V_dt%values
       ! call apply_BC(new_BC_data,BC_nums,new_force_data,force_nums,&
                  ! U_dt,it,NT)
-      ! !print*, U_dt%values(2202:2203,2)
-   ! endif
-   ! call cpu_time(time6)
+      call apply_BC(BC_data,BC_nums,force_data,force_nums,&
+                 U_dt,it,NT)
+      print*, "data values ", U_dt%values(1,2)
+   endif
+   call cpu_time(time6)
 ! !   print*, 'start looping elements'
    ! do i=1,local_nums(myid+1)
       ! ! This output en will be local node id
        ! call element_info(i,element_data_local,node_data, en,node)
 
-       ! call get_deformed_node_coord(node,en,U_dt)
-       ! U_el(1:7:2,1) = U_dt%values(en(1,1:4),1)
-       ! U_el(2:8:2,1) = U_dt%values(en(1,1:4),2)
-       ! K_el(:,:) = zero 
+       call get_deformed_node_coord(node,en,U_dt)
+       U_el(1:7:2,1) = U_dt%values(en(1,1:4),1)
+       U_el(2:8:2,1) = U_dt%values(en(1,1:4),2)
+       K_el(:,:) = zero 
    ! !=============================================================
    ! !== Then following calculation are totally localized:
    ! !--- loop over integration point ---   
-       ! do intp=1,num_Gauss_points
-         ! gauss(1,1:2) = Gauss_4(intp,1:2)
-         ! call shape_function(gauss,N)
-         ! call Jacobian(gauss,node,jaco,det_jacobian)
-         ! N_ab = get_N_ab(gauss)
-         ! call get_B(jaco,N_ab,B,inv_J)
-         ! B_trans = transpose(B)      
-         ! call &
-         ! dgemm('n','n',8,3,3,1.d0,B_trans,8,mat_mtx,3,0.d0,temp1,8)
-         ! call &
-         ! dgemm('n','n',8,8,3,1.d0,temp1,8,B,3,0.d0,K_el_int,8)
-         ! K_el_int = K_el_int*det_jacobian
-         ! K_el = K_el + K_el_int
-         ! call get_strain(eps,U_el,B,en,intp)
-         ! call get_stress(sig,eps,mat_mtx,en,intp)
-       ! enddo
-   ! !--- calculate internal stress ---
-         ! call dgemv('n',8,8,1.d0,K_el,8,U_el,1,0.d0,F_el,1)
-         ! call cpu_time(time8)
+       do intp=1,num_Gauss_points
+         gauss(1,1:2) = Gauss_4(intp,1:2)
+         call shape_function(gauss,N)
+         call Jacobian(gauss,node,jaco,det_jacobian)
+         N_ab = get_N_ab(gauss)
+         call get_B(jaco,N_ab,B,inv_J)
+         B_trans = transpose(B)      
+         call &
+         dgemm('n','n',8,3,3,1.d0,B_trans,8,mat_mtx,3,0.d0,temp1,8)
+         call &
+         dgemm('n','n',8,8,3,1.d0,temp1,8,B,3,0.d0,K_el_int,8)
+         K_el_int = K_el_int*det_jacobian
+         K_el = K_el + K_el_int
+         call get_strain(eps,U_el,B,en,intp)
+         call get_stress(sig,eps,mat_mtx,en,intp)
+       enddo
+   !--- calculate internal stress ---
+         call dgemv('n',8,8,1.d0,K_el,8,U_el,1,0.d0,F_el,1)
+         call cpu_time(time8)
 
-         ! call assemble_internal_force(F_el,R_int,node_nums,en)
+         call assemble_internal_force(F_el,R_int,node_nums,en)
    ! !==============================================================
          ! call cpu_time(time9)
   ! enddo
   ! !! LUCIANO, COMMENTED
   ! !-- Send and receive shared node info -- 
   ! !
-  ! !  print*, size(R_int)
+  !!print*, size(R_int)
 
   ! ! if (myid .ne. 0) then
      ! ! call mpi_send(R_int, 2*node_nums,MPI_double, 0,0,mpi_comm_world,&
@@ -239,18 +242,18 @@ do it = 1,NT
      ! ! enddo
   ! ! endif
 ! !---------------------------------------
-  ! call cpu_time(time7)
-   ! !print '(" Time for all element internal force calculation:", & 
-   ! !         f10.5)',time3-time2
-   ! if (myid .eq. 0) then
-      ! call calculate_acceleration(R_ext,R_int,Mass,node_nums,A_temp)
-      ! !call extrapolate_stress_to_node(sig,node_nums)
-   ! !   print*, sig%values(2202,2)
-   ! !--- calculate acceleration    
-      ! A_dt%values(:,1) = A_temp(1:2*node_nums-1:2)
-      ! A_dt%values(:,2) = A_temp(2:2*node_nums:2)
-      ! call cpu_time(time5)
-      ! print '("Timestep", I8, ",   cpu time=", f10.5)',it,time7-time6
+  call cpu_time(time7)
+   !print '(" Time for all element internal force calculation:", & 
+   !         f10.5)',time3-time2
+   !!if (myid .eq. 0) then
+      call calculate_acceleration(R_ext,R_int,Mass,node_nums,A_temp)
+      !call extrapolate_stress_to_node(sig,node_nums)
+   !   print*, sig%values(2202,2)
+   !--- calculate acceleration    
+      A_dt%values(:,1) = A_temp(1:2*node_nums-1:2)
+      A_dt%values(:,2) = A_temp(2:2*node_nums:2)
+      call cpu_time(time5)
+      print '("Timestep", I8, ",   cpu time=", f10.5)',it,time7-time6
 
       ! !!call MPI_Bcast(A_temp,2*node_nums,MPI_double, 0,MPI_comm_world,ierr) !LUCIANO, COMMENTED
    ! !print*, A_temp(4400:4404) 
